@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #10213f;
+  --muted: #4f5e7a;
+  --tint: #f1f5fb;
+  --sky: #e7f0ff;
+  --line: #dce6f5;
+  --azure: #2b7fff;
+  --azure-deep: #1f5fcc;
+  --box: #f6f7f9;
+  --est-bg: #f1f8dc;
+  --est-fg: #4e6e0e;
+  --pla-bg: #fff3d6;
+  --pla-fg: #8c5e00;
+  --unp-bg: #eef1f5;
+  --unp-fg: #5a6472;
+  --danger: #c2410c;
+  --edge: #b8c4d6;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-tint: var(--tint);
+  --color-sky: var(--sky);
+  --color-line: var(--line);
+  --color-azure: var(--azure);
+  --color-azure-deep: var(--azure-deep);
+  --color-box: var(--box);
+  --color-est-bg: var(--est-bg);
+  --color-est-fg: var(--est-fg);
+  --color-pla-bg: var(--pla-bg);
+  --color-pla-fg: var(--pla-fg);
+  --color-unp-bg: var(--unp-bg);
+  --color-unp-fg: var(--unp-fg);
+  --color-danger: var(--danger);
+  --color-edge: var(--edge);
+  --font-sans: var(--font-geist), Inter, system-ui, sans-serif;
+}
+
+html {
+  background: #ffffff;
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  text-wrap: balance;
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%234f5e7a' stroke-width='1.4'%3E%3Cpath d='M2.5 4.5l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+}
