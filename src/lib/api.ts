@@ -1,9 +1,9 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export type Fabric = "cotton" | "wool";
-export type Status = "pending" | "processing" | "complete" | "sent" | "cancelled";
+export type Status = "pending" | "processing" | "complete" | "delivered" | "cancelled";
 
-export type Product = { style: string; name: string; type: string; variant: string | null; fabric: Fabric; sizes: string[]; price: number };
+export type Product = { style: string; name: string; type: string; variant: string | null; length: string | null; fabric: Fabric; sizes: string[]; price: number };
 export type Colour = { code: string; name: string; hex: string };
 export type Catalogue = { products: Product[]; colours: Record<Fabric, Colour[]> };
 export type Customer = { id: string; first_name: string; last_name: string };
@@ -28,7 +28,7 @@ export type NewOrder = {
   notes?: string;
 };
 
-export const STATUSES: Status[] = ["pending", "processing", "complete", "sent", "cancelled"];
+export const STATUSES: Status[] = ["pending", "processing", "complete", "delivered", "cancelled"];
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createOrder, getCatalogue, listCustomers, money, type Catalogue, type Customer, type Product } from "@/lib/api";
-import { Button, Input, Notice, Stepper, Swatch, label } from "@/components/ui";
+import { Button, Input, Notice, Stepper, Swatch, attention, label } from "@/components/ui";
 import { Option, SearchIcon, ChevronIcon, menuPanel, useDismiss } from "@/components/Dropdown";
 import { ColourMenu, FabricMenu, GarmentMenu, SizeMenu } from "@/components/CatalogueMenus";
 import { GarmentPhoto } from "@/components/GarmentPhoto";
@@ -15,6 +15,7 @@ type Row = Choice & { key: number; garment: string | null; quantity: number };
 // A customer picked from the list has an id; a new one is just a name until the order creates it.
 type CustomerChoice = Pick<Customer, "first_name" | "last_name"> & { id?: string };
 
+const FIELDS = ["garment", "fabric", "colour", "size"] as const;
 const ROW_GRID = "grid grid-cols-[44px_minmax(0,1fr)_96px_minmax(0,1fr)_76px_80px_72px_28px] items-center gap-2.5";
 
 let nextKey = 1;
@@ -43,11 +44,17 @@ export function NewOrder() {
   }, []);
 
   const garments = useMemo(() => (catalogue ? garmentsOf(catalogue) : []), [catalogue]);
-  // Resolve each row's garment and product once per render.
+  // Resolve each row's garment and product once per render, and what it still needs (in fill order).
   const resolved = rows.map((r) => {
-    const garment = garments.find((g) => g.name === r.garment) ?? null;
-    return { row: r, garment, product: versionFor(garment, r.fabric) };
+    const garment = garments.find((g) => g.id === r.garment) ?? null;
+    const missing = FIELDS.filter((f) => !r[f]);
+    return { row: r, garment, product: versionFor(garment, r.fabric), missing, next: missing[0] };
   });
+  // "Still needed" list, shown before submitting.
+  const todo = [
+    ...(customer ? [] : ["customer"]),
+    ...resolved.flatMap((x, i) => (x.missing.length ? [`${rows.length > 1 ? `item ${i + 1}` : "item"}: ${x.missing.join(", ")}`] : [])),
+  ];
 
   function update(key: number, fn: (r: Row) => Row) {
     setSelected(key);
@@ -55,19 +62,11 @@ export function NewOrder() {
   }
 
   // Keep what still applies; a fabric or size that's the only option is chosen for you.
-  const settle = (r: Row): Row => (catalogue ? { ...r, ...fit(catalogue, garments.find((g) => g.name === r.garment) ?? null, r, true) } : r);
+  const settle = (r: Row): Row => (catalogue ? { ...r, ...fit(catalogue, garments.find((g) => g.id === r.garment) ?? null, r, true) } : r);
 
   const pieces = rows.reduce((n, r) => n + r.quantity, 0);
   const total = resolved.reduce((s, x) => s + (x.product?.price ?? 0) * x.row.quantity, 0);
   const preview = resolved.find((x) => x.row.key === selected) ?? resolved[0];
-
-  function missingItem(): string | null {
-    for (const [i, r] of rows.entries()) {
-      const what = !r.garment ? "a garment" : !r.fabric ? "a fabric" : !r.colour ? "a colour" : !r.size ? "a size" : null;
-      if (what) return rows.length === 1 ? `Choose ${what}` : `Item ${i + 1}: choose ${what}`;
-    }
-    return null;
-  }
 
   async function submit() {
     if (!customer) {
@@ -75,8 +74,7 @@ export function NewOrder() {
       setFocusCustomer((n) => n + 1);
       return setError(null);
     }
-    const problem = missingItem();
-    if (problem) return setError(problem);
+    if (todo.length) return; // the footer already lists what is still needed
     setSubmitting(true);
     setError(null);
     try {
@@ -126,7 +124,7 @@ export function NewOrder() {
                 <span />
               </div>
 
-              {resolved.map(({ row: r, garment: g, product: p }) => (
+              {resolved.map(({ row: r, garment: g, product: p, next }) => (
                 <div key={r.key} className={`${ROW_GRID} border-b border-line px-3.5 py-2.5 ${r.key === preview?.row.key ? "bg-tint" : "bg-white"}`}>
                   <button type="button" aria-label="Preview item" onClick={() => setSelected(r.key)} className="h-11 w-11 overflow-hidden rounded-lg">
                     {g ? (
@@ -136,16 +134,34 @@ export function NewOrder() {
                     )}
                   </button>
 
-                  <GarmentMenu garments={garments} value={g} onPick={(x) => x && update(r.key, (row) => settle({ ...row, garment: x.name }))} />
-                  <FabricMenu value={r.fabric} available={g ? fabricsOf(g) : []} disabled={!g} onPick={(f) => update(r.key, (row) => settle({ ...row, fabric: f }))} />
+                  <GarmentMenu
+                    garments={garments}
+                    value={g}
+                    attention={next === "garment"}
+                    onPick={(x) => x && update(r.key, (row) => settle({ ...row, garment: x.id }))}
+                  />
+                  <FabricMenu
+                    value={r.fabric}
+                    available={g ? fabricsOf(g) : []}
+                    disabled={!g}
+                    attention={next === "fabric"}
+                    onPick={(f) => update(r.key, (row) => settle({ ...row, fabric: f }))}
+                  />
                   <ColourMenu
                     catalogue={catalogue}
                     fabrics={r.fabric ? [r.fabric] : []}
                     value={r.colour}
                     disabled={!r.fabric}
+                    attention={next === "colour"}
                     onPick={(c) => update(r.key, (row) => ({ ...row, colour: c }))}
                   />
-                  <SizeMenu sizes={g ? sizesOf(g, r.fabric) : []} value={r.size} disabled={!g} onPick={(s) => update(r.key, (row) => ({ ...row, size: s }))} />
+                  <SizeMenu
+                    sizes={g ? sizesOf(g, r.fabric) : []}
+                    value={r.size}
+                    disabled={!g}
+                    attention={next === "size"}
+                    onPick={(s) => update(r.key, (row) => ({ ...row, size: s }))}
+                  />
                   <Stepper max={99} value={r.quantity} onChange={(quantity) => update(r.key, (row) => ({ ...row, quantity }))} />
 
                   <span className={`text-right text-[14.5px] font-semibold ${p ? "" : "text-muted/50"}`}>{p ? money(p.price * r.quantity) : "—"}</span>
@@ -187,6 +203,15 @@ export function NewOrder() {
             {error && <Notice onClose={() => setError(null)}>{error}</Notice>}
 
             <div className="flex flex-wrap items-center justify-end gap-5 border-t border-line pt-5">
+              <p className={`mr-auto text-[13.5px] ${todo.length ? "text-pla-fg" : "text-est-fg"}`}>
+                {todo.length ? (
+                  <>
+                    <span className="font-semibold">Still needed:</span> {todo.join(" · ")}
+                  </>
+                ) : (
+                  "✓ Ready to place"
+                )}
+              </p>
               <span className="text-[13.5px] text-muted">
                 {rows.length} {rows.length === 1 ? "item" : "items"} · {pieces} {pieces === 1 ? "piece" : "pieces"}
               </span>
@@ -224,7 +249,7 @@ function Preview({ catalogue, garment, product, row, index }: { catalogue: Catal
         ) : (
           <>
             <div>
-              <div className="text-[17px] font-semibold tracking-tight">{garment.name}</div>
+              <div className="text-[17px] font-semibold tracking-tight">{garment.title}</div>
               <div className="mt-0.5 text-[13px] text-muted">
                 {product ? `${fabricLabel(product.fabric)} · ${product.style} · ${money(product.price)} each` : "Choose wool or cotton"}
               </div>
@@ -339,7 +364,8 @@ function CustomerPicker({
         </button>
       ) : (
         <label
-          className={`flex h-12 w-[360px] max-w-[calc(100vw-40px)] items-center gap-2.5 rounded-lg border bg-white px-3.5 focus-within:ring-1 ${
+          data-attention={!value && !invalid}
+          className={`flex h-12 w-[360px] max-w-[calc(100vw-40px)] items-center gap-2.5 rounded-lg border bg-white px-3.5 focus-within:ring-1 ${attention} ${
             invalid ? "border-danger ring-1 ring-danger focus-within:ring-danger" : "border-edge focus-within:border-azure focus-within:ring-azure"
           }`}
         >

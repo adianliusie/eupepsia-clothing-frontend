@@ -15,12 +15,14 @@ export function GarmentMenu({
   onPick,
   placeholder = "Select garment",
   anyLabel,
+  attention,
 }: {
   garments: Garment[];
   value: Garment | null;
   onPick: (g: Garment | null) => void;
   placeholder?: string;
   anyLabel?: string;
+  attention?: boolean;
 }) {
   const [q, setQ] = useState("");
   const query = q.trim().toLowerCase();
@@ -29,14 +31,14 @@ export function GarmentMenu({
       TYPES.map((t) => ({
         type: t,
         options: garments.filter(
-          (g) => g.type === t && (!query || `${g.name} ${g.versions.map((v) => v.style).join(" ")}`.toLowerCase().includes(query)),
+          (g) => g.type === t && (!query || `${g.title} ${g.versions.map((v) => v.style).join(" ")}`.toLowerCase().includes(query)),
         ),
       })).filter((x) => x.options.length),
     [garments, query],
   );
 
   return (
-    <Dropdown label="Garment" trigger={value ? <span className="truncate">{value.name}</span> : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[360px]">
+    <Dropdown label="Garment" attention={attention} trigger={value ? <span className="truncate">{value.title}</span> : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[360px]">
       {(close) => {
         const pick = (g: Garment | null) => () => {
           onPick(g);
@@ -66,7 +68,7 @@ export function GarmentMenu({
               <div key={grp.type}>
                 <GroupHeading>{grp.type}</GroupHeading>
                 {grp.options.map((g) => (
-                  <Option key={g.name} selected={g.name === value?.name} onClick={pick(g)}>
+                  <Option key={g.id} selected={g.id === value?.id} onClick={pick(g)}>
                     <GarmentPhoto type={g.type} className="h-10 w-8 flex-none rounded object-[center_25%]" iconSize={18} />
                     {g.label}
                   </Option>
@@ -87,6 +89,7 @@ export function FabricMenu({
   disabled,
   placeholder = "Select",
   anyLabel,
+  attention,
 }: {
   value: Fabric | null;
   available: Fabric[];
@@ -94,9 +97,10 @@ export function FabricMenu({
   disabled?: boolean;
   placeholder?: string;
   anyLabel?: string;
+  attention?: boolean;
 }) {
   return (
-    <Dropdown label="Fabric" disabled={disabled} trigger={value ? fabricLabel(value) : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[150px]">
+    <Dropdown label="Fabric" attention={attention} disabled={disabled} trigger={value ? fabricLabel(value) : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[150px]">
       {(close) => {
         const pick = (f: Fabric | null) => () => {
           onPick(f);
@@ -130,6 +134,7 @@ export function ColourMenu({
   disabled,
   placeholder = "Select colour",
   anyLabel,
+  attention,
 }: {
   catalogue: Catalogue;
   fabrics: Fabric[];
@@ -138,11 +143,13 @@ export function ColourMenu({
   disabled?: boolean;
   placeholder?: string;
   anyLabel?: string;
+  attention?: boolean;
 }) {
   const chosen = fabrics.map((f) => colourOf(catalogue, f, value)).find(Boolean);
   return (
     <Dropdown
       label="Colour"
+      attention={attention}
       disabled={disabled}
       trigger={
         chosen ? (
@@ -193,6 +200,7 @@ export function SizeMenu({
   disabled,
   placeholder = "Size",
   anyLabel,
+  attention,
 }: {
   sizes: string[];
   value: string | null;
@@ -200,9 +208,10 @@ export function SizeMenu({
   disabled?: boolean;
   placeholder?: string;
   anyLabel?: string;
+  attention?: boolean;
 }) {
   return (
-    <Dropdown label="Size" disabled={disabled} trigger={value ? sizeLabel(value) : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[130px]">
+    <Dropdown label="Size" attention={attention} disabled={disabled} trigger={value ? sizeLabel(value) : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[130px]">
       {(close) => {
         const pick = (s: string | null) => () => {
           onPick(s);

@@ -12,31 +12,27 @@ export const colourOf = (c: Catalogue, fabric: Fabric, code: string | null | und
 /** Every size in the catalogue, in catalogue order. */
 export const allSizes = (c: Catalogue) => [...new Set(c.products.flatMap((p) => p.sizes))];
 
-/** A garment is a catalogue name ("Tunic, straight — long sleeve"); each fabric it comes in is its own style code. */
-export type Garment = { name: string; type: string; label: string; versions: Product[] };
+/**
+ * A garment is one cut, whatever the fabric: same type, variant and length. Each fabric it comes in is its own style code.
+ * `label` is its line under the type heading ("Straight, long sleeve · 30""), `title` the full name ("Tunic, straight — long sleeve · 30"").
+ */
+export type Garment = { id: string; type: string; label: string; title: string; versions: Product[] };
 
 export const fabricsOf = (g: Garment) => g.versions.map((v) => v.fabric);
 export const versionFor = (g: Garment | null, fabric: Fabric | null | "") => (g && fabric ? g.versions.find((v) => v.fabric === fabric) ?? null : null);
 export const sizesOf = (g: Garment, fabric?: Fabric | null | "") => (versionFor(g, fabric ?? null) ?? g.versions[0]).sizes;
 
-// "Tunic, straight — long sleeve" listed under Tunic reads "Straight — long sleeve".
-function styleLabel(p: Product) {
-  if (p.name.startsWith(`${p.type}, `)) {
-    const s = p.name.slice(p.type.length + 2);
-    return s[0].toUpperCase() + s.slice(1);
-  }
-  if (p.name.startsWith(`${p.type} `)) return p.name.slice(p.type.length + 1);
-  return p.name;
-}
+const join = (...parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
 
 export function garmentsOf(c: Catalogue): Garment[] {
-  const byName = new Map<string, Garment>();
+  const byId = new Map<string, Garment>();
   for (const p of c.products) {
-    const g = byName.get(p.name);
+    const id = [p.type, p.variant, p.length].join("|");
+    const g = byId.get(id);
     if (g) g.versions.push(p);
-    else byName.set(p.name, { name: p.name, type: p.type, label: styleLabel(p), versions: [p] });
+    else byId.set(id, { id, type: p.type, label: join(p.variant, p.length) || p.name, title: join(p.name, p.length), versions: [p] });
   }
-  return [...byName.values()];
+  return [...byId.values()];
 }
 
 export type Choice = { fabric: Fabric | null; colour: string | null; size: string | null };

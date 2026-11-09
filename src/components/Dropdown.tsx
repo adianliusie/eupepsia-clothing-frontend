@@ -51,12 +51,15 @@ export function Dropdown({
   label,
   menuClassName = "w-full",
   disabled = false,
+  attention = false,
 }: {
   trigger: ReactNode;
   children: (close: () => void) => ReactNode;
   label: string;
   menuClassName?: string;
   disabled?: boolean;
+  /** Highlight as the next thing to fill in. */
+  attention?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -70,6 +73,7 @@ export function Dropdown({
         aria-haspopup="listbox"
         aria-expanded={open}
         disabled={disabled}
+        data-attention={attention && !disabled}
         onClick={() => setOpen((o) => !o)}
         className={`${control} flex items-center gap-2 px-2.5 text-left font-medium disabled:cursor-not-allowed disabled:bg-box disabled:hover:border-edge`}
       >

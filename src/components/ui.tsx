@@ -3,9 +3,11 @@
 import type { ReactNode, InputHTMLAttributes } from "react";
 import { STATUSES, type Status } from "@/lib/api";
 
+/** Amber "fill this in next" look, switched on with `data-attention="true"`. A variant, so it wins over the base border and background. */
+export const attention = "data-[attention=true]:border-pla-fg/50 data-[attention=true]:bg-pla-bg/60 data-[attention=true]:hover:border-pla-fg";
+
 // Every fillable control is white with a visible border.
-export const control =
-  "h-11 w-full rounded-lg border border-edge bg-white px-3 text-[14px] text-ink outline-none placeholder:text-muted/60 hover:border-ink focus:border-azure focus:ring-1 focus:ring-azure disabled:opacity-50";
+export const control = `h-11 w-full rounded-lg border border-edge bg-white px-3 text-[14px] text-ink outline-none placeholder:text-muted/60 hover:border-ink focus:border-azure focus:ring-1 focus:ring-azure disabled:opacity-50 ${attention}`;
 
 export const label = "text-[12.5px] font-medium text-muted";
 
@@ -40,7 +42,7 @@ const statusStyle: Record<Status, string> = {
   pending: "bg-pla-bg text-pla-fg",
   processing: "bg-sky text-azure-deep",
   complete: "bg-est-bg text-est-fg",
-  sent: "bg-ink text-white",
+  delivered: "bg-ink text-white",
   cancelled: "bg-unp-bg text-unp-fg",
 };
 

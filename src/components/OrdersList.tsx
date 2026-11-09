@@ -14,7 +14,7 @@ const STATUS_TABS: { value: string; label: string }[] = [
   { value: "pending", label: "Pending" },
   { value: "processing", label: "Processing" },
   { value: "complete", label: "Complete" },
-  { value: "sent", label: "Sent" },
+  { value: "delivered", label: "Delivered" },
   { value: "cancelled", label: "Cancelled" },
   { value: "all", label: "All" },
 ];
@@ -39,7 +39,7 @@ export function OrdersList() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [customer, setCustomer] = useState<{ id: string; name: string } | null>(null);
-  const [garmentName, setGarmentName] = useState<string | null>(null);
+  const [garmentId, setGarmentId] = useState<string | null>(null);
   const [choice, setChoice] = useState<Choice>(NO_CHOICE);
   const [sort, setSort] = useState("-created_at");
 
@@ -53,7 +53,7 @@ export function OrdersList() {
   }, [q]);
 
   const garments = useMemo(() => (catalogue ? garmentsOf(catalogue) : []), [catalogue]);
-  const garment = garments.find((g) => g.name === garmentName) ?? null;
+  const garment = garments.find((g) => g.id === garmentId) ?? null;
   const { fabric, colour, size } = choice;
 
   // A garment filter is its style code(s): one per fabric it comes in, narrowed by the fabric filter.
@@ -99,7 +99,6 @@ export function OrdersList() {
   function toggleSort(col: Sortable) {
     setSort((s) => (s === `-${col}` ? col : `-${col}`));
   }
-  const sortMark = (col: Sortable) => (sort === col ? " ↑" : sort === `-${col}` ? " ↓" : "");
 
   async function changeStatus(order: Order, s: Status) {
     setBusy(order.id);
@@ -113,18 +112,18 @@ export function OrdersList() {
     }
   }
 
-  const filtersOn = Boolean(debouncedQ || customer || garmentName || fabric || colour || size);
+  const filtersOn = Boolean(debouncedQ || customer || garmentId || fabric || colour || size);
   function clearFilters() {
     setQ("");
     setCustomer(null);
-    setGarmentName(null);
+    setGarmentId(null);
     setChoice(NO_CHOICE);
   }
 
   // Changing one filter drops the others that no longer fit it.
-  function refine(name: string | null, next: Choice) {
-    setGarmentName(name);
-    if (catalogue) setChoice(fit(catalogue, garments.find((g) => g.name === name) ?? null, next));
+  function refine(id: string | null, next: Choice) {
+    setGarmentId(id);
+    if (catalogue) setChoice(fit(catalogue, garments.find((g) => g.id === id) ?? null, next));
   }
 
   const total = page?.total ?? 0;
@@ -132,18 +131,30 @@ export function OrdersList() {
   const to = page ? Math.min(total, page.page * page.page_size) : 0;
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const th = (label: string, col?: Sortable, right = false) => (
-    <th className={`py-2.5 pr-4 font-medium ${right ? "text-right" : "text-left"}`}>
-      {col ? (
-        <button type="button" onClick={() => toggleSort(col)} className={`hover:text-ink ${sort.replace("-", "") === col ? "text-ink" : ""}`}>
-          {label}
-          {sortMark(col)}
-        </button>
-      ) : (
-        label
-      )}
-    </th>
-  );
+  // Sortable headers are buttons with an up/down mark: both arrows faint when unsorted, one dark arrow when active.
+  const th = (label: string, col?: Sortable, right = false) => {
+    const dir = col && sort === col ? "ascending" : col && sort === `-${col}` ? "descending" : undefined;
+    return (
+      <th aria-sort={dir} className={`py-2 pr-4 font-medium ${right ? "text-right" : "text-left"}`}>
+        {col ? (
+          <button
+            type="button"
+            onClick={() => toggleSort(col)}
+            title={`Sort by ${label.toLowerCase()}`}
+            className={`-mx-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 hover:bg-tint hover:text-ink ${right ? "flex-row-reverse" : ""} ${dir ? "text-ink" : ""}`}
+          >
+            {label}
+            <svg width="9" height="12" viewBox="0 0 9 12" aria-hidden className="flex-none">
+              <path d="M4.5 1L8 5H1z" fill="currentColor" opacity={dir === "ascending" ? 1 : dir ? 0.15 : 0.35} />
+              <path d="M4.5 11L1 7h7z" fill="currentColor" opacity={dir === "descending" ? 1 : dir ? 0.15 : 0.35} />
+            </svg>
+          </button>
+        ) : (
+          label
+        )}
+      </th>
+    );
+  };
 
   return (
     <>
@@ -172,8 +183,8 @@ export function OrdersList() {
       {catalogue && (
         <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(200px,1.2fr)_minmax(0,1.4fr)_120px_minmax(0,1.1fr)_104px_auto]">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or order number" className={control} />
-          <GarmentMenu garments={garments} value={garment} onPick={(g) => refine(g?.name ?? null, choice)} placeholder="Any garment" anyLabel="Any garment" />
-          <FabricMenu value={fabric} available={garment ? fabricsOf(garment) : FABRICS} onPick={(f) => refine(garmentName, { ...choice, fabric: f })} placeholder="Any fabric" anyLabel="Any fabric" />
+          <GarmentMenu garments={garments} value={garment} onPick={(g) => refine(g?.id ?? null, choice)} placeholder="Any garment" anyLabel="Any garment" />
+          <FabricMenu value={fabric} available={garment ? fabricsOf(garment) : FABRICS} onPick={(f) => refine(garmentId, { ...choice, fabric: f })} placeholder="Any fabric" anyLabel="Any fabric" />
           <ColourMenu
             catalogue={catalogue}
             fabrics={fabric ? [fabric] : garment ? fabricsOf(garment) : FABRICS}
