@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatDate, getCatalogue, getOrder, money, updateStatus, type Catalogue, type Order, type Status } from "@/lib/api";
-import { Button, Notice, StatusSelect, Swatch, eyebrow } from "@/components/ui";
+import { Button, Notice, StatusSelect, Swatch } from "@/components/ui";
+import { eyebrow } from "@/lib/styles";
+import { colourOf, fabricLabel, productByStyle } from "@/lib/garments";
 
 export function OrderDetail({ id }: { id: string }) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -36,12 +38,9 @@ export function OrderDetail({ id }: { id: string }) {
   if (error && !order) return <Notice>{error}</Notice>;
   if (!order || !catalogue) return <p className="py-16 text-center text-sm text-muted">Loading order…</p>;
 
-  const product = (style: string) => catalogue.products.find((p) => p.style === style);
-  const colourOf = (fabric: string, code: string) => catalogue.colours[fabric as "wool" | "cotton"]?.find((c) => c.code === code);
-
   return (
     <div className="mx-auto max-w-3xl">
-      <Link href="/orders">
+      <Link href="/track">
         <Button variant="outline" size="sm">← All orders</Button>
       </Link>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
@@ -82,19 +81,21 @@ export function OrderDetail({ id }: { id: string }) {
         </thead>
         <tbody>
           {order.items.map((i, idx) => {
-            const p = product(i.style);
+            const p = productByStyle(catalogue, i.style);
+            const c = p && colourOf(catalogue, p.fabric, i.colour);
             return (
               <tr key={idx} className="border-t border-line">
                 <td className="py-3.5 pr-4">
                   <div className="font-medium">{p?.name ?? i.style}</div>
-                  <div className="text-[13px] text-muted capitalize">
-                    {p?.fabric} · {i.style}
+                  <div className="text-[13px] text-muted">
+                    {p && `${fabricLabel(p.fabric)} · `}
+                    {i.style}
                   </div>
                 </td>
                 <td className="py-3.5 pr-4 text-muted">
                   <span className="inline-flex items-center gap-2">
-                    {p && colourOf(p.fabric, i.colour) && <Swatch hex={colourOf(p.fabric, i.colour)!.hex} size={18} />}
-                    {p ? (colourOf(p.fabric, i.colour)?.name ?? i.colour) : i.colour}
+                    {c && <Swatch hex={c.hex} size={18} />}
+                    {c?.name ?? i.colour}
                     <span className="text-muted/60">{i.colour}</span>
                   </span>
                 </td>

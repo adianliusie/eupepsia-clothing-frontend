@@ -1,9 +1,6 @@
-import type { Metadata } from "next";
-import { OrderDetail } from "@/components/OrderDetail";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Order" };
-
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OldOrderLink({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <OrderDetail id={id} />;
+  redirect(`/track/${id}`);
 }

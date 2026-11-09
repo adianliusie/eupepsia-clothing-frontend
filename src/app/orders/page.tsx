@@ -1,13 +1,8 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
-import { OrdersList } from "@/components/OrdersList";
+import { NewOrder } from "@/components/NewOrder";
 
-export const metadata: Metadata = { title: "Orders" };
+export const metadata: Metadata = { title: "New order" };
 
 export default function OrdersPage() {
-  return (
-    <Suspense>
-      <OrdersList />
-    </Suspense>
-  );
+  return <NewOrder />;
 }

@@ -22,13 +22,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="flex items-center gap-7 text-sm">
               <Link href="/orders" className="inline-flex min-h-10 items-center hover:text-azure">
-                All orders
-              </Link>
-              <Link
-                href="/orders?new=1"
-                className="inline-flex min-h-9 items-center rounded-lg bg-azure px-4 font-medium text-white hover:bg-azure-deep"
-              >
                 New order
+              </Link>
+              <Link href="/track" className="inline-flex min-h-10 items-center hover:text-azure">
+                Track orders
               </Link>
             </nav>
           </div>

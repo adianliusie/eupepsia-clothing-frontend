@@ -5,13 +5,14 @@ export type Status = "pending" | "processing" | "complete" | "sent" | "cancelled
 
 export type Product = { style: string; name: string; type: string; variant: string | null; fabric: Fabric; sizes: string[]; price: number };
 export type Colour = { code: string; name: string; hex: string };
-export type Catalogue = { products: Product[]; colours: Record<Fabric, Colour[]>; statuses: Status[] };
+export type Catalogue = { products: Product[]; colours: Record<Fabric, Colour[]> };
+export type Customer = { id: string; first_name: string; last_name: string };
 
 export type OrderItem = { style: string; colour: string; size: string; quantity: number; unit_price: number; line_total: number };
 export type Order = {
   id: string;
   order_number: string;
-  customer: { id: string; first_name: string; last_name: string };
+  customer: Customer;
   status: Status;
   items: OrderItem[];
   total: number;
@@ -51,6 +52,7 @@ export type OrderQuery = {
   customer_id?: string;
   type?: string;
   fabric?: Fabric | "";
+  style?: string; // one code, or several comma-separated
   colour?: string;
   size?: string;
   sort?: string; // "-created_at" etc
@@ -66,6 +68,7 @@ export function listOrders(query: OrderQuery = {}) {
   return request<Page<Order>>(`/orders${s ? `?${s}` : ""}`);
 }
 export const getOrder = (id: string) => request<Order>(`/orders/${id}`);
+export const listCustomers = () => request<Customer[]>("/users");
 export const createOrder = (body: NewOrder) => request<Order>("/orders", { method: "POST", body: JSON.stringify(body) });
 export const updateStatus = (id: string, status: Status) =>
   request<Order>(`/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatDate, getCatalogue, listOrders, money, updateStatus, type Catalogue, type Fabric, type Order, type OrderQuery, type Page, type Status } from "@/lib/api";
-import { Button, Notice, PageHead, Select, StatusSelect, Swatch, control } from "@/components/ui";
-import { OrderModal } from "@/components/OrderModal";
+import { useEffect, useMemo, useState } from "react";
+import { formatDate, getCatalogue, getOrder, listOrders, money, updateStatus, type Catalogue, type Order, type OrderQuery, type Page, type Status } from "@/lib/api";
+import { Button, Notice, PageHead, StatusSelect, Swatch, control } from "@/components/ui";
+import { ColourMenu, FabricMenu, GarmentMenu, SizeMenu } from "@/components/CatalogueMenus";
+import { FABRICS, allSizes, colourOf, fabricsOf, fit, garmentsOf, productByStyle, sizesOf, type Choice } from "@/lib/garments";
 
 const OPEN = "pending,processing";
 const STATUS_TABS: { value: string; label: string }[] = [
@@ -17,15 +18,14 @@ const STATUS_TABS: { value: string; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
   { value: "all", label: "All" },
 ];
-const TYPES = ["Top", "Tunic", "Dress", "Cardigan", "Hoodie", "Pants", "Shawl"];
 const PAGE_SIZE = 50;
+const NO_CHOICE: Choice = { fabric: null, colour: null, size: null };
 
 type Sortable = "created_at" | "order_number" | "total" | "status";
 
 export function OrdersList() {
   const router = useRouter();
   const params = useSearchParams();
-  const modalOpen = params.get("new") === "1";
 
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
   const [page, setPage] = useState<Page<Order> | null>(null);
@@ -39,11 +39,9 @@ export function OrdersList() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [customer, setCustomer] = useState<{ id: string; name: string } | null>(null);
-  const [type, setType] = useState("");
-  const [fabric, setFabric] = useState<Fabric | "">("");
-  const [colour, setColour] = useState("");
+  const [garmentName, setGarmentName] = useState<string | null>(null);
+  const [choice, setChoice] = useState<Choice>(NO_CHOICE);
   const [sort, setSort] = useState("-created_at");
-  const [pageNo, setPageNo] = useState(1);
 
   useEffect(() => {
     getCatalogue().then(setCatalogue).catch((e) => setError(e.message));
@@ -54,39 +52,49 @@ export function OrdersList() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const query: OrderQuery = useMemo(
-    () => ({ status, q: debouncedQ, customer_id: customer?.id, type, fabric, colour, sort, page: pageNo, page_size: PAGE_SIZE }),
-    [status, debouncedQ, customer, type, fabric, colour, sort, pageNo],
-  );
+  const garments = useMemo(() => (catalogue ? garmentsOf(catalogue) : []), [catalogue]);
+  const garment = garments.find((g) => g.name === garmentName) ?? null;
+  const { fabric, colour, size } = choice;
 
-  const load = useCallback(() => {
+  // A garment filter is its style code(s): one per fabric it comes in, narrowed by the fabric filter.
+  const style = garment?.versions
+    .filter((v) => !fabric || v.fabric === fabric)
+    .map((v) => v.style)
+    .join(",");
+  const filters = { status, q: debouncedQ, customer_id: customer?.id, sort, colour: colour ?? "", size: size ?? "", ...(style ? { style } : { fabric: fabric ?? "" }) };
+
+  // Any filter change goes back to page 1: the page number belongs to one set of filters.
+  const filterKey = JSON.stringify(filters);
+  const [paging, setPaging] = useState({ key: filterKey, n: 1 });
+  const pageNo = paging.key === filterKey ? paging.n : 1;
+  const goTo = (n: number) => setPaging({ key: filterKey, n });
+
+  const query: OrderQuery = useMemo(() => ({ ...JSON.parse(filterKey), page: pageNo, page_size: PAGE_SIZE }), [filterKey, pageNo]);
+
+  useEffect(() => {
+    let live = true;
     setLoading(true);
     listOrders(query)
       .then((p) => {
+        if (!live) return;
         setPage(p);
         setError(null);
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => live && setError(e.message))
+      .finally(() => live && setLoading(false));
+    return () => {
+      live = false;
+    };
   }, [query]);
 
-  useEffect(load, [load]);
-  // any filter change goes back to page 1
-  useEffect(() => setPageNo(1), [status, debouncedQ, customer, type, fabric, colour, sort]);
-
-  const productName = (style: string) => catalogue?.products.find((p) => p.style === style)?.name ?? style;
-  const colourOf = (style: string, code: string) => {
-    const p = catalogue?.products.find((x) => x.style === style);
-    return p ? catalogue?.colours[p.fabric].find((c) => c.code === code) : undefined;
-  };
-  const colourOptions = useMemo(() => {
-    if (!catalogue) return [];
-    const list = fabric ? catalogue.colours[fabric] : [...catalogue.colours.wool, ...catalogue.colours.cotton];
-    return list.map((c) => ({ ...c, fabric: fabric || (catalogue.colours.wool.includes(c) ? "wool" : "cotton") }));
-  }, [catalogue, fabric]);
-
-  const openModal = () => router.push("/orders?new=1");
-  const closeModal = () => router.push("/orders");
+  // A freshly placed order arrives as ?placed=<id>.
+  useEffect(() => {
+    const placedId = params.get("placed");
+    if (placedId) {
+      getOrder(placedId).then(setPlaced).catch(() => {});
+      router.replace("/track");
+    }
+  }, [params, router]);
 
   function toggleSort(col: Sortable) {
     setSort((s) => (s === `-${col}` ? col : `-${col}`));
@@ -105,13 +113,18 @@ export function OrdersList() {
     }
   }
 
-  const filtersOn = Boolean(debouncedQ || customer || type || fabric || colour);
+  const filtersOn = Boolean(debouncedQ || customer || garmentName || fabric || colour || size);
   function clearFilters() {
     setQ("");
     setCustomer(null);
-    setType("");
-    setFabric("");
-    setColour("");
+    setGarmentName(null);
+    setChoice(NO_CHOICE);
+  }
+
+  // Changing one filter drops the others that no longer fit it.
+  function refine(name: string | null, next: Choice) {
+    setGarmentName(name);
+    if (catalogue) setChoice(fit(catalogue, garments.find((g) => g.name === name) ?? null, next));
   }
 
   const total = page?.total ?? 0;
@@ -134,7 +147,14 @@ export function OrdersList() {
 
   return (
     <>
-      <PageHead title="Orders" action={<Button onClick={openModal}>New order</Button>} />
+      <PageHead
+        title="Track orders"
+        action={
+          <Link href="/orders">
+            <Button>New order</Button>
+          </Link>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-1 border-y border-line py-2.5">
         {STATUS_TABS.map((t) => (
@@ -149,40 +169,31 @@ export function OrdersList() {
         ))}
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(200px,1.4fr)_1fr_1fr_1.2fr_auto]">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or order number" className={control} />
-        <Select value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="">Any garment</option>
-          {TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={fabric}
-          onChange={(e) => {
-            setFabric(e.target.value as Fabric | "");
-            setColour("");
-          }}
-        >
-          <option value="">Any fabric</option>
-          <option value="wool">Wool</option>
-          <option value="cotton">Cotton</option>
-        </Select>
-        <Select value={colour} onChange={(e) => setColour(e.target.value)}>
-          <option value="">Any colour</option>
-          {colourOptions.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.name} · {c.code}
-              {fabric ? "" : ` (${c.fabric})`}
-            </option>
-          ))}
-        </Select>
-        <Button variant="outline" onClick={clearFilters} disabled={!filtersOn}>
-          Clear
-        </Button>
-      </div>
+      {catalogue && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(200px,1.2fr)_minmax(0,1.4fr)_120px_minmax(0,1.1fr)_104px_auto]">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or order number" className={control} />
+          <GarmentMenu garments={garments} value={garment} onPick={(g) => refine(g?.name ?? null, choice)} placeholder="Any garment" anyLabel="Any garment" />
+          <FabricMenu value={fabric} available={garment ? fabricsOf(garment) : FABRICS} onPick={(f) => refine(garmentName, { ...choice, fabric: f })} placeholder="Any fabric" anyLabel="Any fabric" />
+          <ColourMenu
+            catalogue={catalogue}
+            fabrics={fabric ? [fabric] : garment ? fabricsOf(garment) : FABRICS}
+            value={colour}
+            onPick={(c) => setChoice({ ...choice, colour: c })}
+            placeholder="Any colour"
+            anyLabel="Any colour"
+          />
+          <SizeMenu
+            sizes={garment ? sizesOf(garment, fabric) : allSizes(catalogue)}
+            value={size}
+            onPick={(s) => setChoice({ ...choice, size: s })}
+            placeholder="Any size"
+            anyLabel="Any size"
+          />
+          <Button variant="outline" onClick={clearFilters} disabled={!filtersOn}>
+            Clear
+          </Button>
+        </div>
+      )}
 
       {customer && (
         <div className="mt-3 flex items-center gap-2 text-[13.5px]">
@@ -200,7 +211,7 @@ export function OrdersList() {
         <div className="mt-4">
           <Notice kind="success" onClose={() => setPlaced(null)}>
             Order {placed.order_number} placed for {placed.customer.first_name} {placed.customer.last_name}, {money(placed.total)}.{" "}
-            <Link href={`/orders/${placed.id}`} className="font-medium underline underline-offset-2">
+            <Link href={`/track/${placed.id}`} className="font-medium underline underline-offset-2">
               View
             </Link>
           </Notice>
@@ -216,13 +227,13 @@ export function OrdersList() {
         <span>{loading && !page ? "Loading…" : total === 0 ? "No orders" : `${from}–${to} of ${total}`}</span>
         {lastPage > 1 && (
           <span className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" disabled={pageNo <= 1} onClick={() => setPageNo((p) => p - 1)}>
+            <Button variant="ghost" size="sm" disabled={pageNo <= 1} onClick={() => goTo(pageNo - 1)}>
               ← Prev
             </Button>
             <span>
               Page {pageNo} of {lastPage}
             </span>
-            <Button variant="ghost" size="sm" disabled={pageNo >= lastPage} onClick={() => setPageNo((p) => p + 1)}>
+            <Button variant="ghost" size="sm" disabled={pageNo >= lastPage} onClick={() => goTo(pageNo + 1)}>
               Next →
             </Button>
           </span>
@@ -250,7 +261,7 @@ export function OrdersList() {
                 return (
                   <tr key={o.id} className={`border-t border-line align-top ${isNew ? "bg-est-bg/40" : ""}`}>
                     <td className="py-3 pr-4 font-medium whitespace-nowrap">
-                      <Link href={`/orders/${o.id}`} className="hover:text-azure">
+                      <Link href={`/track/${o.id}`} className="hover:text-azure">
                         {o.order_number}
                       </Link>
                     </td>
@@ -263,11 +274,12 @@ export function OrdersList() {
                     <td className="py-3 pr-4 text-muted">
                       <ul className="flex flex-col gap-0.5">
                         {o.items.map((i, idx) => {
-                          const c = colourOf(i.style, i.colour);
+                          const p = catalogue && productByStyle(catalogue, i.style);
+                          const c = p ? colourOf(catalogue, p.fabric, i.colour) : undefined;
                           return (
                             <li key={idx} className="flex items-center gap-2 whitespace-nowrap">
                               {c && <Swatch hex={c.hex} size={12} />}
-                              <span className="text-ink">{productName(i.style)}</span>
+                              <span className="text-ink">{p?.name ?? i.style}</span>
                               <span>
                                 {c?.name ?? i.colour} · {i.size}
                                 {i.quantity > 1 ? ` · ×${i.quantity}` : ""}
@@ -294,25 +306,12 @@ export function OrdersList() {
         <div className="py-16 text-center text-[13.5px] text-muted">
           {filtersOn || status !== OPEN ? "Nothing matches these filters." : "No open orders."}{" "}
           {!filtersOn && status === OPEN && (
-            <button type="button" onClick={openModal} className="font-medium text-azure hover:underline">
+            <Link href="/orders" className="font-medium text-azure hover:underline">
               Place one
-            </button>
+            </Link>
           )}
         </div>
       )}
-
-      <OrderModal
-        open={modalOpen}
-        onClose={closeModal}
-        onPlaced={(o) => {
-          setPlaced(o);
-          closeModal();
-          clearFilters();
-          setStatus(OPEN);
-          setSort("-created_at");
-          load();
-        }}
-      />
     </>
   );
 }

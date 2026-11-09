@@ -1,33 +1,16 @@
 "use client";
 
-import type { ReactNode, SelectHTMLAttributes, InputHTMLAttributes } from "react";
-import type { Status } from "@/lib/api";
-export { container, eyebrow } from "@/lib/styles";
+import type { ReactNode, InputHTMLAttributes } from "react";
+import { STATUSES, type Status } from "@/lib/api";
 
 // Every fillable control is white with a visible border.
 export const control =
-  "h-10 w-full rounded-lg border border-edge bg-white px-3 text-[14px] text-ink outline-none placeholder:text-muted/60 hover:border-ink focus:border-azure focus:ring-1 focus:ring-azure disabled:opacity-50";
+  "h-11 w-full rounded-lg border border-edge bg-white px-3 text-[14px] text-ink outline-none placeholder:text-muted/60 hover:border-ink focus:border-azure focus:ring-1 focus:ring-azure disabled:opacity-50";
 
 export const label = "text-[12.5px] font-medium text-muted";
 
-export function Field({ label: text, children, className = "", hint }: { label: string; children: ReactNode; className?: string; hint?: string }) {
-  return (
-    <label className={`flex flex-col gap-1.5 ${className}`}>
-      <span className={label}>
-        {text}
-        {hint && <span className="ml-1.5 font-normal text-muted/70">{hint}</span>}
-      </span>
-      {children}
-    </label>
-  );
-}
-
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${control} ${props.className ?? ""}`} />;
-}
-
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={`${control} ${props.className ?? ""}`} />;
 }
 
 export function Button({
@@ -41,7 +24,7 @@ export function Button({
     outline: "border border-edge bg-white text-ink hover:border-ink",
     ghost: "text-muted hover:text-ink",
   };
-  const sizes = { md: "h-10 px-5 text-[14px]", sm: "h-8 px-3 text-[13px]" };
+  const sizes = { md: "h-11 px-5 text-[14px]", sm: "h-8 px-3 text-[13px]" };
   return (
     <button
       type="button"
@@ -53,23 +36,6 @@ export function Button({
   );
 }
 
-export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div className="flex h-10 gap-0.5 rounded-lg border border-edge bg-white p-[3px]">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`flex-1 rounded-[5px] px-2 text-[13.5px] font-medium ${o.value === value ? "bg-ink text-white" : "text-muted hover:bg-tint hover:text-ink"}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 const statusStyle: Record<Status, string> = {
   pending: "bg-pla-bg text-pla-fg",
   processing: "bg-sky text-azure-deep",
@@ -78,10 +44,6 @@ const statusStyle: Record<Status, string> = {
   cancelled: "bg-unp-bg text-unp-fg",
 };
 
-export function StatusBadge({ status }: { status: Status }) {
-  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-[13px] font-medium capitalize ${statusStyle[status]}`}>{status}</span>;
-}
-
 export function StatusSelect({ value, onChange, busy }: { value: Status; onChange: (s: Status) => void; busy?: boolean }) {
   return (
     <select
@@ -89,10 +51,9 @@ export function StatusSelect({ value, onChange, busy }: { value: Status; onChang
       disabled={busy}
       onChange={(e) => onChange(e.target.value as Status)}
       onClick={(e) => e.stopPropagation()}
-      className={`h-8 cursor-pointer rounded-full border-0 py-0 pl-3 text-[13px] font-medium capitalize outline-none ring-azure focus:ring-2 disabled:opacity-50 ${statusStyle[value]}`}
-      style={{ backgroundImage: "none", paddingRight: 12 }}
+      className={`h-8 cursor-pointer appearance-none rounded-full border-0 py-0 px-3 text-[13px] font-medium capitalize outline-none ring-azure focus:ring-2 disabled:opacity-50 ${statusStyle[value]}`}
     >
-      {(["pending", "processing", "complete", "sent", "cancelled"] as Status[]).map((s) => (
+      {STATUSES.map((s) => (
         <option key={s} value={s} className="text-ink">
           {s}
         </option>
@@ -124,46 +85,24 @@ export function Notice({ kind = "error", children, onClose }: { kind?: "error" |
   );
 }
 
-/** A row of mutually exclusive pills. */
-export function Pills<T extends string>({ value, options, onChange, size = "md" }: { value: T; options: { value: T; label: string; disabled?: boolean }[]; onChange: (v: T) => void; size?: "md" | "sm" }) {
-  const h = size === "md" ? "h-9 px-3 text-[13.5px]" : "h-8 px-2.5 text-[13px]";
+/** Quantity box sized to sit in a row of h-11 controls. */
+export function Stepper({ value, onChange, max }: { value: number; onChange: (n: number) => void; max?: number }) {
+  const btn = "grid h-full w-6 flex-none place-items-center text-[16px] text-muted hover:bg-tint hover:text-ink disabled:opacity-30";
+  const clamp = (n: number) => Math.max(1, max === undefined ? n : Math.min(max, n));
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            disabled={o.disabled}
-            onClick={() => onChange(o.value)}
-            className={`${h} rounded-lg border font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
-              on ? "border-ink bg-ink text-white" : "border-edge bg-white text-ink hover:border-ink"
-            }`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export function Stepper({ value, onChange, min = 1 }: { value: number; onChange: (n: number) => void; min?: number }) {
-  const btn = "grid h-full w-8 place-items-center text-[16px] text-muted hover:bg-tint hover:text-ink disabled:opacity-30";
-  return (
-    <div className="flex h-10 w-[104px] overflow-hidden rounded-lg border border-edge bg-white focus-within:border-azure focus-within:ring-1 focus-within:ring-azure">
-      <button type="button" aria-label="Fewer" disabled={value <= min} onClick={() => onChange(value - 1)} className={btn}>
+    <div className="flex h-11 w-[80px] overflow-hidden rounded-lg border border-edge bg-white focus-within:border-azure focus-within:ring-1 focus-within:ring-azure">
+      <button type="button" aria-label="Fewer" disabled={value <= 1} onClick={() => onChange(value - 1)} className={btn}>
         −
       </button>
       <input
         type="number"
-        min={min}
+        min={1}
+        max={max}
         value={value}
-        onChange={(e) => onChange(Math.max(min, Number(e.target.value) || min))}
+        onChange={(e) => onChange(clamp(Number(e.target.value) || 1))}
         className="w-full min-w-0 border-0 bg-transparent text-center text-[14px] font-semibold outline-none"
       />
-      <button type="button" aria-label="More" onClick={() => onChange(value + 1)} className={btn}>
+      <button type="button" aria-label="More" disabled={max !== undefined && value >= max} onClick={() => onChange(clamp(value + 1))} className={btn}>
         +
       </button>
     </div>
@@ -173,4 +112,3 @@ export function Stepper({ value, onChange, min = 1 }: { value: number; onChange:
 export function Swatch({ hex, size = 22 }: { hex: string; size?: number }) {
   return <span aria-hidden className="inline-block flex-none rounded-[5px] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.14)]" style={{ background: hex, width: size, height: size }} />;
 }
-
