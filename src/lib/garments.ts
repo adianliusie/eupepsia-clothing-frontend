@@ -1,6 +1,7 @@
 import type { Catalogue, Colour, Fabric, Product } from "@/lib/api";
 
-export const TYPES = ["Top", "Tunic", "Dress", "Cardigan", "Hoodie", "Pants", "Shawl"];
+/** Preferred menu order. Types the catalogue has but this list lacks still show, after these. */
+const TYPE_ORDER = ["Tunic", "Dress", "Cardigan", "Hoodie", "Pants", "Top", "Shawl", "Beanie"];
 export const FABRICS: Fabric[] = ["wool", "cotton"];
 export const fabricLabel = (f: Fabric) => (f === "wool" ? "Wool" : "Cotton");
 export const MILL: Record<Fabric, string> = { wool: "Zegna Baruffa Cashwool merino", cotton: "Maurice Brassard combed cotton" };
@@ -23,6 +24,12 @@ export const versionFor = (g: Garment | null, fabric: Fabric | null | "") => (g 
 export const sizesOf = (g: Garment, fabric?: Fabric | null | "") => (versionFor(g, fabric ?? null) ?? g.versions[0]).sizes;
 
 const join = (...parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
+
+/** The garment types present, in TYPE_ORDER first and then catalogue order. */
+export function typesOf(garments: Garment[]): string[] {
+  const rank = (t: string) => (TYPE_ORDER.includes(t) ? TYPE_ORDER.indexOf(t) : TYPE_ORDER.length);
+  return [...new Set(garments.map((g) => g.type))].sort((a, b) => rank(a) - rank(b));
+}
 
 export function garmentsOf(c: Catalogue): Garment[] {
   const byId = new Map<string, Garment>();

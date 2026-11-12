@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { control } from "@/components/ui";
 
+// Phones (below md) get the menu as a fixed sheet. Variant classes, so they win over menuPanel's position and any menu width.
+const sheetOnPhones = "max-md:fixed max-md:inset-x-3 max-md:top-16 max-md:z-40 max-md:mt-0 max-md:w-auto max-md:min-w-0 max-md:max-h-[70vh]";
+
 export const menuPanel = "absolute left-0 top-full z-30 mt-1.5 rounded-[10px] border border-edge bg-white p-1.5 shadow-[0_16px_40px_-12px_rgba(16,33,63,0.28)]";
 
 /** Call `onDismiss` on a click outside `ref` or on Escape, while `open`. */
@@ -40,6 +43,9 @@ export const SearchIcon = () => (
     <path d="M11 11l3.5 3.5" />
   </svg>
 );
+
+/** True with a mouse or trackpad; false on touch screens. Read when a menu opens (client only). */
+export const hasFinePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches;
 
 /** Grey trigger text shown before anything is chosen. */
 export const Placeholder = ({ children }: { children: string }) => <span className="truncate font-normal text-muted">{children}</span>;
@@ -81,9 +87,13 @@ export function Dropdown({
         <ChevronIcon />
       </button>
       {open && (
-        <div role="listbox" className={`${menuPanel} max-h-[440px] overflow-y-auto ${menuClassName}`}>
-          {children(() => setOpen(false))}
-        </div>
+        <>
+          {/* Phones: the menu is a sheet across the screen (kept near the top so the keyboard doesn't cover it) over a tap-to-close backdrop. */}
+          <div aria-hidden className="fixed inset-0 z-30 bg-ink/30 md:hidden" onClick={() => setOpen(false)} />
+          <div role="listbox" className={`${menuPanel} ${sheetOnPhones} max-h-[440px] overflow-y-auto ${menuClassName}`}>
+            {children(() => setOpen(false))}
+          </div>
+        </>
       )}
     </div>
   );

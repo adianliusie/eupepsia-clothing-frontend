@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import type { Catalogue, Fabric } from "@/lib/api";
-import { Dropdown, GroupHeading, Option, Placeholder, SearchIcon } from "@/components/Dropdown";
+import { Dropdown, GroupHeading, Option, Placeholder, SearchIcon, hasFinePointer } from "@/components/Dropdown";
 import { GarmentPhoto } from "@/components/GarmentPhoto";
 import { Swatch } from "@/components/ui";
-import { FABRICS, TYPES, colourOf, fabricLabel, sizeLabel, type Garment } from "@/lib/garments";
+import { FABRICS, typesOf, colourOf, fabricLabel, sizeLabel, type Garment } from "@/lib/garments";
 
 // The order form and the /track filters share these. Pass `anyLabel` to offer a "clear" option first (filters do).
 
@@ -28,7 +28,7 @@ export function GarmentMenu({
   const query = q.trim().toLowerCase();
   const groups = useMemo(
     () =>
-      TYPES.map((t) => ({
+      typesOf(garments).map((t) => ({
         type: t,
         options: garments.filter(
           (g) => g.type === t && (!query || `${g.title} ${g.versions.map((v) => v.style).join(" ")}`.toLowerCase().includes(query)),
@@ -38,7 +38,7 @@ export function GarmentMenu({
   );
 
   return (
-    <Dropdown label="Garment" attention={attention} trigger={value ? <span className="truncate">{value.title}</span> : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[360px]">
+    <Dropdown label="Garment" attention={attention} trigger={value ? <span className="line-clamp-2 leading-tight lg:line-clamp-1">{value.title}</span> : <Placeholder>{placeholder}</Placeholder>} menuClassName="w-[360px]">
       {(close) => {
         const pick = (g: Garment | null) => () => {
           onPick(g);
@@ -50,7 +50,7 @@ export function GarmentMenu({
             <label className="flex h-[38px] items-center gap-2 rounded-md bg-box px-2.5 text-muted">
               <SearchIcon />
               <input
-                autoFocus
+                autoFocus={hasFinePointer()} // not on phones: it would pop the keyboard over the list
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 aria-label="Filter garments"
@@ -69,7 +69,7 @@ export function GarmentMenu({
                 <GroupHeading>{grp.type}</GroupHeading>
                 {grp.options.map((g) => (
                   <Option key={g.id} selected={g.id === value?.id} onClick={pick(g)}>
-                    <GarmentPhoto type={g.type} className="h-10 w-8 flex-none rounded object-[center_25%]" iconSize={18} />
+                    <GarmentPhoto garment={g} className="h-10 w-8 flex-none rounded object-[center_25%]" />
                     {g.label}
                   </Option>
                 ))}

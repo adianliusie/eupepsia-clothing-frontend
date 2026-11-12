@@ -7,6 +7,7 @@ const PATHS: Record<string, string> = {
   Hoodie: '<path d="M17 10l-11 7 4 21h5V24v18h18V24v14h5l4-21-11-7"/><path d="M17 10c0-4 3-6 7-6s7 2 7 6c0 4-3 8-7 8s-7-4-7-8z"/><path d="M19 32h10v6H19z"/>',
   Pants: '<path d="M14 6h20l3 36h-9l-4-24-4 24h-9z"/><path d="M14 11h20"/>',
   Shawl: '<path d="M6 12h36L24 42z"/><path d="M13 23l-2 5M18 31l-2 5M35 23l2 5M30 31l2 5"/>',
+  Beanie: '<path d="M10 32c0-12 6-22 14-22s14 10 14 22"/><path d="M8 32h32v8H8z"/><path d="M14 32v8M20 32v8M26 32v8M32 32v8"/><circle cx="24" cy="8" r="2"/>',
 };
 
 export function GarmentIcon({ type, size = 28, className = "" }: { type: string; size?: number; className?: string }) {

@@ -8,7 +8,7 @@ export type Colour = { code: string; name: string; hex: string };
 export type Catalogue = { products: Product[]; colours: Record<Fabric, Colour[]> };
 export type Customer = { id: string; first_name: string; last_name: string };
 
-export type OrderItem = { style: string; colour: string; size: string; quantity: number; unit_price: number; line_total: number };
+export type OrderItem = { style: string; colour: string; size: string; quantity: number; unit_price: number; line_total: number; note?: string | null };
 export type Order = {
   id: string;
   order_number: string;
@@ -24,7 +24,7 @@ export type Order = {
 export type NewOrder = {
   first_name: string;
   last_name: string;
-  items: { style: string; colour: string; size: string; quantity: number }[];
+  items: { style: string; colour: string; size: string; quantity: number; note?: string }[];
   notes?: string;
 };
 

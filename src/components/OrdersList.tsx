@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatDate, getCatalogue, getOrder, listOrders, money, updateStatus, type Catalogue, type Order, type OrderQuery, type Page, type Status } from "@/lib/api";
 import { Button, Notice, PageHead, StatusSelect, Swatch, control } from "@/components/ui";
 import { ColourMenu, FabricMenu, GarmentMenu, SizeMenu } from "@/components/CatalogueMenus";
+import { Dropdown, Option } from "@/components/Dropdown";
 import { FABRICS, allSizes, colourOf, fabricsOf, fit, garmentsOf, productByStyle, sizesOf, type Choice } from "@/lib/garments";
 
 const OPEN = "pending,processing";
@@ -22,6 +23,18 @@ const PAGE_SIZE = 50;
 const NO_CHOICE: Choice = { fabric: null, colour: null, size: null };
 
 type Sortable = "created_at" | "order_number" | "total" | "status";
+type Sort = Sortable | `-${Sortable}`;
+/** The phone sort menu (desktop sorts from the column headers). */
+const SORT_OPTIONS: { value: Sort; label: string }[] = [
+  { value: "-created_at", label: "Newest" },
+  { value: "created_at", label: "Oldest" },
+  { value: "status", label: "Status" },
+  { value: "-total", label: "Highest total" },
+  { value: "order_number", label: "Order number" },
+];
+const COLUMN_LABEL: Record<Sortable, string> = { created_at: "Date", order_number: "Order", total: "Total", status: "Status" };
+const sortLabel = (s: Sort) =>
+  SORT_OPTIONS.find((o) => o.value === s)?.label ?? `${COLUMN_LABEL[s.replace("-", "") as Sortable]} ${s.startsWith("-") ? "↓" : "↑"}`;
 
 export function OrdersList() {
   const router = useRouter();
@@ -41,7 +54,7 @@ export function OrdersList() {
   const [customer, setCustomer] = useState<{ id: string; name: string } | null>(null);
   const [garmentId, setGarmentId] = useState<string | null>(null);
   const [choice, setChoice] = useState<Choice>(NO_CHOICE);
-  const [sort, setSort] = useState("-created_at");
+  const [sort, setSort] = useState<Sort>("-created_at");
 
   useEffect(() => {
     getCatalogue().then(setCatalogue).catch((e) => setError(e.message));
@@ -131,6 +144,40 @@ export function OrdersList() {
   const to = page ? Math.min(total, page.page * page.page_size) : 0;
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  // Per-order bits shared by the desktop table and the phone cards.
+  const customerOf = (o: Order) => {
+    const name = `${o.customer.first_name} ${o.customer.last_name}`;
+    return { name, show: () => setCustomer({ id: o.customer.id, name }) };
+  };
+  const highlight = (o: Order) => (placed?.id === o.id ? "bg-est-bg/40" : "");
+
+  // Garment lines for one order, shared by the desktop table and the phone cards.
+  const itemLines = (o: Order, lineClass = "") => {
+    const qty = o.items.reduce((n, i) => n + i.quantity, 0);
+    return (
+      <>
+        <ul className="flex flex-col gap-0.5">
+          {o.items.map((i, idx) => {
+            const p = catalogue && productByStyle(catalogue, i.style);
+            const c = p ? colourOf(catalogue, p.fabric, i.colour) : undefined;
+            return (
+              <li key={idx} className={`flex flex-wrap items-center gap-x-2 ${lineClass}`}>
+                {c && <Swatch hex={c.hex} size={12} />}
+                <span className="text-ink">{p?.name ?? i.style}</span>
+                <span>
+                  {c ? `${c.name} ${i.colour}` : i.colour} · {i.size}
+                  {i.quantity > 1 ? ` · ×${i.quantity}` : ""}
+                </span>
+                {i.note && <span className="w-full italic">“{i.note}”</span>}
+              </li>
+            );
+          })}
+        </ul>
+        {qty > 1 && o.items.length > 1 && <span className="text-[12px] text-muted/70">{qty} pieces</span>}
+      </>
+    );
+  };
+
   // Sortable headers are buttons with an up/down mark: both arrows faint when unsorted, one dark arrow when active.
   const th = (label: string, col?: Sortable, right = false) => {
     const dir = col && sort === col ? "ascending" : col && sort === `-${col}` ? "descending" : undefined;
@@ -181,7 +228,7 @@ export function OrdersList() {
       </div>
 
       {catalogue && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(200px,1.2fr)_minmax(0,1.4fr)_120px_minmax(0,1.1fr)_104px_auto]">
+        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-[minmax(200px,1.2fr)_minmax(0,1.4fr)_120px_minmax(0,1.1fr)_104px_auto] [&>*:nth-child(-n+2)]:col-span-2 lg:[&>*:nth-child(-n+2)]:col-span-1">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or order number" className={control} />
           <GarmentMenu garments={garments} value={garment} onPick={(g) => refine(g?.id ?? null, choice)} placeholder="Any garment" anyLabel="Any garment" />
           <FabricMenu value={fabric} available={garment ? fabricsOf(garment) : FABRICS} onPick={(f) => refine(garmentId, { ...choice, fabric: f })} placeholder="Any fabric" anyLabel="Any fabric" />
@@ -234,8 +281,27 @@ export function OrdersList() {
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between text-[13px] text-muted">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted">
         <span>{loading && !page ? "Loading…" : total === 0 ? "No orders" : `${from}–${to} of ${total}`}</span>
+        {/* Phones have no column headers, so sorting is a menu here. */}
+          <div className="w-44 md:hidden">
+              <Dropdown label="Sort" trigger={<span className="truncate">Sort: {sortLabel(sort)}</span>}>
+                {(close) =>
+                  SORT_OPTIONS.map((o) => (
+                    <Option
+                      key={o.value}
+                      selected={o.value === sort}
+                      onClick={() => {
+                        setSort(o.value);
+                        close();
+                      }}
+                    >
+                      {o.label}
+                    </Option>
+                  ))
+                }
+              </Dropdown>
+          </div>
         {lastPage > 1 && (
           <span className="flex items-center gap-1">
             <Button variant="ghost" size="sm" disabled={pageNo <= 1} onClick={() => goTo(pageNo - 1)}>
@@ -252,7 +318,32 @@ export function OrdersList() {
       </div>
 
       {page && page.items.length > 0 && (
-        <div className={`overflow-x-auto ${loading ? "opacity-60" : ""}`}>
+        <>
+        {/* Phones: one card per order. */}
+        <div className={`md:hidden ${loading ? "opacity-60" : ""}`}>
+          <ul className="flex flex-col gap-2.5">
+            {page.items.map((o) => (
+              <li key={o.id} className={`rounded-xl border border-line bg-white p-3.5 text-[14px] ${highlight(o)}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <Link href={`/track/${o.id}`} className="font-semibold hover:text-azure">
+                    {o.order_number}
+                  </Link>
+                  <StatusSelect value={o.status} busy={busy === o.id} onChange={(s) => changeStatus(o, s)} />
+                </div>
+                <div className="mt-1 flex items-baseline justify-between gap-3">
+                  <button type="button" onClick={customerOf(o).show} className="truncate text-left hover:text-azure">
+                    {customerOf(o).name}
+                  </button>
+                  <span className="whitespace-nowrap font-semibold">{money(o.total)}</span>
+                </div>
+                <div className="mt-0.5 text-[12.5px] text-muted">{formatDate(o.created_at)}</div>
+                <div className="mt-2.5 border-t border-line pt-2.5 text-[13px] text-muted">{itemLines(o)}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className={`hidden overflow-x-auto md:block ${loading ? "opacity-60" : ""}`}>
           <table className="w-full text-[14px]">
             <thead>
               <tr className="text-[12.5px] font-medium text-muted">
@@ -266,11 +357,9 @@ export function OrdersList() {
             </thead>
             <tbody>
               {page.items.map((o) => {
-                const qty = o.items.reduce((n, i) => n + i.quantity, 0);
-                const isNew = placed?.id === o.id;
-                const name = `${o.customer.first_name} ${o.customer.last_name}`;
+                const { name, show } = customerOf(o);
                 return (
-                  <tr key={o.id} className={`border-t border-line align-top ${isNew ? "bg-est-bg/40" : ""}`}>
+                  <tr key={o.id} className={`border-t border-line align-top ${highlight(o)}`}>
                     <td className="py-3 pr-4 font-medium whitespace-nowrap">
                       <Link href={`/track/${o.id}`} className="hover:text-azure">
                         {o.order_number}
@@ -278,29 +367,11 @@ export function OrdersList() {
                     </td>
                     <td className="py-3 pr-4 whitespace-nowrap text-muted">{formatDate(o.created_at)}</td>
                     <td className="py-3 pr-4 whitespace-nowrap">
-                      <button type="button" onClick={() => setCustomer({ id: o.customer.id, name })} className="hover:text-azure" title="Show this customer's orders">
+                      <button type="button" onClick={show} className="hover:text-azure" title="Show this customer's orders">
                         {name}
                       </button>
                     </td>
-                    <td className="py-3 pr-4 text-muted">
-                      <ul className="flex flex-col gap-0.5">
-                        {o.items.map((i, idx) => {
-                          const p = catalogue && productByStyle(catalogue, i.style);
-                          const c = p ? colourOf(catalogue, p.fabric, i.colour) : undefined;
-                          return (
-                            <li key={idx} className="flex items-center gap-2 whitespace-nowrap">
-                              {c && <Swatch hex={c.hex} size={12} />}
-                              <span className="text-ink">{p?.name ?? i.style}</span>
-                              <span>
-                                {c?.name ?? i.colour} · {i.size}
-                                {i.quantity > 1 ? ` · ×${i.quantity}` : ""}
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      {qty > 1 && o.items.length > 1 && <span className="text-[12px] text-muted/70">{qty} pieces</span>}
-                    </td>
+                    <td className="py-3 pr-4 text-muted">{itemLines(o, "whitespace-nowrap")}</td>
                     <td className="py-3 pr-4 text-right whitespace-nowrap font-medium">{money(o.total)}</td>
                     <td className="py-3">
                       <StatusSelect value={o.status} busy={busy === o.id} onChange={(s) => changeStatus(o, s)} />
@@ -311,6 +382,7 @@ export function OrdersList() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {page && page.items.length === 0 && !loading && (
